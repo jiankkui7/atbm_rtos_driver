@@ -1,0 +1,53 @@
+Import('RTT_ROOT')
+Import('SDK_ROOT')
+Import('rtconfig')
+
+from building import *
+
+cwd  = GetCurrentDir()
+src = Glob('api/*.c')
+src += Glob('hal/*.c')
+if GetDepend('WIFI_USING_SDIOWIFI'):
+    src += Glob('hal/sdio/*.c')
+else:
+    src += Glob('hal/usb/*.c')
+src += Glob('net/*.c')
+src += Glob('net/wpa/*.c')
+src += Glob('os/fh_rtt/*.c')
+if GetDepend('WIFI_USING_SDIOWIFI'):
+    src += Glob('os/fh_rtt/sdio/*.c')
+else:
+    src += Glob('os/fh_rtt/usb/*.c')
+
+CPPPATH = [cwd, str(Dir('#'))]
+CPPPATH += [cwd + '/api']
+CPPPATH += [cwd + '/include']
+CPPPATH += [cwd + '/hal/include']
+CPPPATH += [cwd + '/net/include']
+CPPPATH += [cwd + '/net/include/proto']
+CPPPATH += [cwd + '/net/wpa/wps/include']
+CPPPATH += [cwd + '/net/wpa/crypto/include']
+CPPPATH += [cwd + '/os/include']
+CPPPATH += [cwd + '/os/fh_rtt/include']
+if GetDepend('WIFI_USING_SDIOWIFI'):
+    CPPPATH += [cwd + '/hal/sdio']
+else:
+    CPPPATH += [cwd + '/hal/usb']
+
+CPPPATH += [SDK_ROOT + '/Libraries/inc']
+#CPPPATH += [SDK_ROOT + '/components/net/api_wifi']
+##marvell wifi
+# 802.11n features
+#
+# CONFIG_STA_AMPDU_RX=y
+# CONFIG_STA_AMPDU_TX=y
+# CONFIG_UAP_AMPDU_RX is not set
+# CONFIG_UAP_AMPDU_TX=y
+myccflags = ('-w -Wall')
+
+if GetDepend('WIFI_USING_SDIOWIFI'):
+	group = DefineGroup('atbm', src, depend = ['WIFI_USING_ATBM_6031'], LIBRARY = 1, CPPPATH = CPPPATH)
+else:
+	group = DefineGroup('atbm', src, depend = ['WIFI_USING_USBWIFI_6032I'],LIBRARY = 1, CPPPATH = CPPPATH)
+
+Return('group')

@@ -1,0 +1,173 @@
+###############################################################################
+#  * Project name atbm6031 SDIO WiFi
+#  * @author eason.li
+#  * @date	2021-05-18
+###############################################################################
+
+CONFIG_ATBM603x=y
+#USING_ATBM_SDIO_BUS=y 
+USING_ATBM_USB_BUS=y
+ 
+ifeq ($(USING_ATBM_USB_BUS),y)
+PROJ = libatbm
+else
+PROJ = libatbm_sdio
+EXTRA_CFLAGS += -DWIFI_SDIO=1
+endif
+
+TARGET = $(PROJ).a
+
+SDK_ROOT=/usr/lchome/yuzhihuang/FullH/8856/RTT/FH_RT_V2.1.2_20191225/bsp/rt-thread
+CUR_DIR ?= $(shell pwd)
+TOP_DIR ?= $(SDK_ROOT)
+
+##############################################################################
+
+CROSS_PREFIX := /usr/lchome/yuzhihuang/FullH/toolchain/8626_rtt/bin/arm-fullhan-eabi-
+CROSS_PATH  ?= /usr/lchome/yuzhihuang/FullH/toolchain/8626_rtt/bin
+CC           = $(CROSS_PREFIX)gcc
+CPP          = $(CROSS_PREFIX)g++
+SIZE         = $(CROSS_PREFIX)size
+STRIP        = $(CROSS_PREFIX)strip
+AS           = $(CC)
+AR           = $(CROSS_PREFIX)ar
+LD           = $(CROSS_PREFIX)ld
+RM           = rm -rf
+MKDIR        = mkdir
+
+###############################################################################
+#  * Configuration Dir
+###############################################################################
+
+LIBDIR = $(CUR_DIR)
+SDK_BUILD_STATIC_WIFI_DIR = $(SDK_ROOT)/extlib/lib/
+###############################################################################
+#  * include .h
+###############################################################################
+INCLUDE	= -I. \
+		-I$(CUR_DIR)/api \
+		-I$(CUR_DIR)/hal \
+		-I$(CUR_DIR)/hal/include \
+		-I$(CUR_DIR)/include \
+		-I$(CUR_DIR)/net/include \
+		-I$(CUR_DIR)/net/include/proto \
+		-I$(CUR_DIR)/os/include	\
+		-I$(CUR_DIR)/net/wpa/wps/include \
+		-I$(CUR_DIR)/net/wpa/crypto/include \
+		-I$(CUR_DIR)/os/fh_rtt/include
+		
+ifeq ($(USING_ATBM_USB_BUS),y)
+HWIF_INC = -I$(CUR_DIR)/hal/usb
+else
+HWIF_INC = -I$(CUR_DIR)/hal/sdio
+endif
+
+KERNEL_INCLUDE	= -I. \
+		-I$(SDK_ROOT)/Libraries/inc \
+		-I$(SDK_ROOT)/kernel \
+		-I$(SDK_ROOT)/kernel/include \
+		-I$(SDK_ROOT)/kernel/include/libc \
+		-I$(SDK_ROOT)/kernel/components/finsh \
+		-I$(SDK_ROOT)/components/usb/include \
+		-I$(SDK_ROOT)/components/usb/host \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/arch \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/arch/include \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include/lwip \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include/netif \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include/lwip/prot \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include/posix \
+		-I$(SDK_ROOT)/kernel/components/net/lwip-2.0.2/src/include/posix/sys \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/dfs_net \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/dfs_net/sys_select/sys \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/socket \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/socket/arpa \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/socket/netinet \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include/socket/sys_socket \
+		-I$(SDK_ROOT)/kernel/components/net/sal_socket/include \
+		-I$(SDK_ROOT)/kernel/components/drivers/include \
+		-I$(SDK_ROOT)/kernel/components/drivers/include/ipc \
+		-I$(SDK_ROOT)/kernel/components/drivers/include/drivers \
+		-I$(SDK_ROOT)/components/wifi/pub/api_wifi \
+		-I$(SDK_ROOT)/extlib/inc
+
+
+INCLUDE += $(HWIF_INC) $(KERNEL_INCLUDE)
+BUILDPATH  ?= build
+
+###############################################################################
+#  * include .c
+###############################################################################
+SRCDIR += api
+SRCDIR += hal
+ifeq ($(USING_ATBM_USB_BUS),y)
+SRCDIR += hal/usb 
+else
+SRCDIR += hal/sdio
+endif
+
+SRCDIR += net
+SRCDIR += net/wpa 
+ifeq ($(USING_ATBM_USB_BUS),y)
+SRCDIR += os/fh_rtt/usb
+else
+SRCDIR += os/fh_rtt/sdio
+endif
+
+SRCDIR += os/fh_rtt
+
+CSRCS += $(foreach d, $(SRCDIR), $(wildcard $d/*.c))
+
+COBJS += $(patsubst %.c, $(BUILDPATH)/%.o, $(CSRCS))
+
+########################### Rules ################################
+#
+CFLAGS		:= -Wall  $(DEFINE) $(INCLUDE) $(EXTRA_CFLAGS) -O2 
+#-std=c99 -mlittle-endian -fno-builtin  -fno-short-enums -nostdlib -mlong-calls
+#-mlittle-endian -x assembler-with-cpp 
+ASFLAGS += -O2 
+
+# --------------------------- s -> o
+$(BUILDPATH)/%.o:%.s
+	@echo ---------------------[build $<]----------------------------------
+	$(CC) -c $(ASFLAGS) $(CFLAGS) -o $@ $<
+
+# ----------------------------- c -> o
+$(BUILDPATH)/%.o:%.c
+	@echo ---------------------[build $<]----------------------------------
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+###############################################################################
+#  * build rule
+###############################################################################
+
+.PHONY: all prepare target clean install 
+
+all: prepare target install
+
+prepare:
+ifneq ($(BUILDPATH),)
+	@for i in $(SRCDIR); \
+	do mkdir -p $(BUILDPATH)/$$i; \
+	done
+endif
+
+target: $(BUILDPATH)/$(TARGET)
+$(BUILDPATH)/$(TARGET): $(COBJS) 
+	@echo ---------------------[build out]----------------------------------	
+	$(AR) -rsv $@  $(COBJS) 
+install: 
+	@if [ ! -e $(BUILDPATH)/$(TARGET) ];then\
+		echo -e "\033[1;31m"$(TARGET) is not exist"\033[m";\
+		/bin/false;	\
+	fi
+	@echo -e "\033[1;32m "install $(BUILDPATH)/$(TARGET) to $(LIBDIR)"\033[m"
+	cp $(BUILDPATH)/$(TARGET) $(LIBDIR)
+	cp $(BUILDPATH)/$(TARGET) $(SDK_BUILD_STATIC_WIFI_DIR)
+	
+clean: 
+	rm -rf $(BUILDPATH)
+	rm $(LIBDIR)/*.a
+
